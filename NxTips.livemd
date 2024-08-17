@@ -1,0 +1,177 @@
+# Nx Tips
+
+```elixir
+Mix.install(
+  [{:nx, "~> 0.5"}] 
+)
+```
+
+## Nx Tip of the Week #1 – Using transforms
+
+Nx is a tensor manipulation or array programming library similar to NumPy, TensorFlow, or PyTorch.
+
+Nx introduces a new type of function definition, defn, that is a subset of the Elixir programming language tailored specifically to numerical computations. When numerical definitions are invoked, they’re transformed into expressions (internally Nx.Defn.Expr) which represent the AST or computation graph of the numerical definition. These expressions are manipulated by compilers (like EXLA) to produce executables that run natively on accelerators.
+
+In newer Nx versions, transform/2 has been removed, so its a better practice to let all math be handled by Nx and the business logic in the Elixir realm.
+
+Use print_expr inside a defn expression to debug the operation.
+
+```elixir
+defmodule NxTest do
+  import Nx.Defn
+
+  def cross_entropy_loss(y_true, y_pred) do
+    check_shape(Nx.shape(y_true), Nx.shape(y_pred))
+    nx_cross_entropy_loss(y_true, y_pred)
+  end
+  
+  defp check_shape(same_shape, same_shape), do: nil
+  defp check_shape(_y_true_shape, _y_pred_shape), 
+    do: raise(ArgumentError, "shapes do not equal")
+  
+  defn tanh_power(a, b) do
+    exp = Nx.tanh(a) + Nx.pow(b, 2)
+    print_expr(exp)
+  end
+
+  defn nx_cross_entropy_loss(y_true, y_pred) do
+    Nx.mean(Nx.log(y_true) * y_pred)
+  end
+end
+```
+
+```elixir
+a = Nx.tensor(0)
+b = Nx.tensor(2)
+NxTest.tanh_power(a, b)
+```
+
+```elixir
+# To validate that is a Tensor.
+{is_struct(a, Nx.Tensor), is_struct(a, Nx)}
+```
+
+```elixir
+y_true = Nx.tensor([10, 10])
+y_pred = Nx.tensor([100, 100])
+NxTest.cross_entropy_loss(y_true, y_pred)
+```
+
+```elixir
+y_true = Nx.tensor([10, 10])
+y_pred = Nx.tensor([100])
+NxTest.cross_entropy_loss(y_true, y_pred)
+```
+
+## Nx Tip of the Week #2 – Tensor Operations for Elixir Programmers
+
+In Elixir, it’s common to manipulate data using the Enum module.
+
+**Element-wise unary functions**
+
+Nx contains a number of element-wise unary functions that are tensor aware.
+
+```elixir
+# Enum way
+a = [1, 2, 3]
+Enum.map(a, fn x -> :math.exp(x) end)
+```
+
+```elixir
+# Nx way (some operation must specify the output type).
+a = Nx.tensor([1, 2, 3], type: {:s, 32}, names: [:data])
+Nx.map(a, [type: {:f, 32}], fn x -> Nx.exp(x) end)
+# Nx.map is not compatible for most Nx compilers.
+```
+
+```elixir
+# Must of Nx functions are tensor aware, 
+# therefore efficient for most Nx compilers
+a = Nx.tensor([1, 2, 3], type: {:f, 32}, names: [:data])
+Nx.exp(a)
+```
+
+```elixir
+a = Nx.iota({2, 2, 1, 2, 1, 2}, type: {:f, 32})
+Nx.exp(a)
+```
+
+**Element-wise binary functions**
+
+```elixir
+# With Enum
+a = [1, 2, 3]
+b = [4, 5, 6]
+a |> Enum.zip(b) |> Enum.map(fn {x, y} -> x + y end)
+```
+
+```elixir
+# In Nx (there is no zip)
+
+a = Nx.tensor([1, 2, 3], type: {:f, 32})
+b = Nx.tensor([4, 5, 6], type: {:f, 32})
+
+Nx.add(a, b)
+```
+
+```elixir
+a = Nx.tensor([[[1, 2, 3], [4, 5, 6], [7, 8, 9]]], type: {:f, 32})
+b = Nx.tensor([[[2, 3, 4], [5, 6, 7], [8, 9, 10]]], type: {:f, 32})
+Nx.add(a, b)
+```
+
+```elixir
+broadcast_scalar = fn x, list -> Enum.map(list, & &1*x) end
+broadcast_scalar.(5, [1, 2, 3])
+```
+
+```elixir
+broadcast_scalar = &Nx.multiply(&1, &2)
+broadcast_scalar.(5, Nx.tensor([1, 2, 3], type: {:f, 32}))
+```
+
+```elixir
+Nx.multiply(5, Nx.tensor([1, 2, 3], type: {:f, 32}))
+```
+
+**Aggregate Operators**
+
+```elixir
+# With Enum
+a = [1, 2, 3]
+Enum.reduce(a, 0, fn x, acc -> x + acc end)
+```
+
+```elixir
+# Multi-dimensional
+a = [[1, 2, 3], [4, 5, 6], [7, 8, 9]]
+
+Enum.reduce(a, 0, fn x, acc ->
+  Enum.reduce(x, 0, fn y, inner_acc ->
+    y + inner_acc
+  end) + acc
+end)
+```
+
+```elixir
+a = [[1, 2, 3], [4, 5, 6], [7, 8, 9]]
+
+Enum.reduce(a, [], fn x, acc ->
+  [
+    Enum.reduce(x, 0, fn y, inner_acc ->
+      y + inner_acc
+    end)
+    | acc
+  ]
+end)
+|> Enum.reverse()
+```
+
+```elixir
+# With Nx, there is Nx.reduce, however, similar to Nx.map, avoid using it, 
+# use native Nx implementations.
+
+a = Nx.tensor([1, 2, 3], type: {:f, 32})
+
+Nx.reduce(a, 0, fn x, acc -> Nx.add(x, acc) end)
+```
