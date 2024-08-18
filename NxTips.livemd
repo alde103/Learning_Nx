@@ -375,3 +375,90 @@ Nx also has a template creation method that defines a template for an expected f
 # with a certain type, shape, and names is expected in the future.
 t = Nx.template({4, 4, 4}, {:f, 32}, names: [:x, :y, :z])
 ```
+
+## Nx Tip of the Week #4 – Using Keywords
+
+Numerical definitions can only accept tensors or numbers as positional arguments; however, you can get around this inflexibility using keyword lists. You can pass and use optional keyword arguments in your numerical definitions with the keyword! method.
+
+**Parameter Initializers**
+
+```elixir
+biases = Nx.broadcast(0.0, {2, 2})
+```
+
+```elixir
+defmodule NxKeywordTest do
+  import Nx.Defn
+
+  defn zeros(opts \\ []) do
+    # This can extract the arguments.
+    opts = keyword!(opts, [:shape, type: {:f, 64}])
+    Nx.broadcast(Nx.tensor(0, type: opts[:type]), opts[:shape])
+  end
+
+  defn trigonomtric_fn(x, opts \\ []) do
+    opts = keyword!(opts, mode: :sin)
+
+    exp =
+      case opts[:mode] do
+        :sin -> Nx.sin(x)
+        :cos -> Nx.cos(x)
+        :tan -> Nx.tan(x)
+      end
+
+    print_expr(exp)
+  end
+
+  defn try_to_add_one(x, opts \\ []) do
+    opts = keyword!(opts, add_one?: true)
+
+    exp = if opts[:add_one?], do: Nx.add(x, 1), else: x
+    print_expr(exp)
+  end
+
+  defn my_function(opts \\ []) do
+    opts = keyword!(opts, [:value])
+    opts[:value]
+  end
+end
+```
+
+```elixir
+NxKeywordTest.zeros(shape: {2, 2})
+```
+
+```elixir
+NxKeywordTest.zeros(shape: {2, 2}, type: {:bf, 16})
+```
+
+**Passing Flags**
+
+```elixir
+NxKeywordTest.trigonomtric_fn(0, mode: :sin)
+```
+
+```elixir
+NxKeywordTest.trigonomtric_fn(0, mode: :cos)
+```
+
+```elixir
+NxKeywordTest.trigonomtric_fn(0, mode: :tan)
+```
+
+```elixir
+NxKeywordTest.try_to_add_one(102, add_one?: true)
+```
+
+```elixir
+NxKeywordTest.try_to_add_one(1, add_one?: false)
+```
+
+**Performance Considerations**
+
+Numerical definitions are JIT compiled and cached based on argument shapes (at least with the EXLA compiler) to avoid unnecessary recompilations. Compilation can be expensive, so you’d like to reuse compiled computations as much as possible.
+
+When using keywords, if you have a value that’s constantly changing, you will force recompilation with the new value every time.
+
+```elixir
+NxKeywordTest.my_function(value: 0.3)
+```
