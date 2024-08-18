@@ -1,9 +1,12 @@
 # Nx Tips
 
 ```elixir
-Mix.install(
-  [{:nx, "~> 0.5"}] 
-)
+Mix.install([
+  {:nx, "~> 0.5"},
+  {:axon, "~> 0.5"},
+  {:table_rex, "~> 3.1.1"},
+  {:exla, "~> 0.5"},
+])
 ```
 
 ## Nx Tip of the Week #1 – Using transforms
@@ -551,3 +554,83 @@ You can only use grad from within defn.
 Backends like Torchx offer flexibility, and facilitate rapid prototyping, with pleasing performance gains over pure Elixir implementations. Compilers like EXLA unlock even more potential performance and memory optimizations, and open the door to things like ahead-of-time compilation. Generally, if you need the flexibility of intermixing Nx code with your regular Elixir code, using a backend is probably the more convenient option. Additionally, some Nx programs are so small or are such that they won’t benefit from performance gains from compilers.
 
 When dealing with compute intensive, purely numerical programs, compilers are usually the better option.
+
+## Axon: Deep Learning in Elixir
+
+Axon consists of the following components:
+
+* Functional API – A low-level API of Elixir defn of which all other APIs build on.
+
+* Model Creation API – A high-level model creation API which manages model initialization and application.
+
+* Optimization API – An API for creating and using first-order optimization techniques.
+
+* Training API – An API for quickly training models.
+
+**Functional API**
+
+At the lowest-level, Axon consists of a number of modules with functional implementations of common methods in deep learning:
+
+* Axon.Activations – Element-wise activation functions.
+* Axon.Initializers – Model parameter initialization functions.
+* Axon.Layers – Common deep learning layer implementations.
+* Axon.Losses – Common loss functions.
+* Axon.Metrics – Training metrics such as accuracy, absolute error, precision, etc.
+
+**Model Creation**
+
+The goal of the model creation API is to eliminate most of the boilerplate associated with creating, initializing, and applying models. The Axon struct represents a model’s computation graph using the following struct:
+
+```
+defstruct [:inputs, :outputs, :nodes]
+```
+
+```elixir
+model =
+  Axon.input("input", shape: {nil, 784})
+  |> Axon.dense(128, activation: :relu)
+  |> Axon.dropout(rate: 0.5)
+  |> Axon.dense(10, activation: :softmax)
+
+dbg(model)
+
+Axon.Display.as_table(model, Nx.template({1, 784}, :f32)) |> IO.puts
+
+```
+
+```elixir
+# you can use regular Elixir functions to represent model building blocks, and compose them.
+defmodule MyModel do
+  def residual(x, units) do
+    x
+    |> Axon.dense(units, activation: :relu)
+    |> Axon.add(x)
+  end
+   
+  def model() do
+    Axon.input("input", shape: {nil, 784})
+    |> Axon.dense(128, activation: :relu)
+    |> residual(128)
+    |> Axon.dense(10, activation: :softmax)
+  end
+end
+```
+
+```elixir
+{init_fn, predict_fn} = Axon.build(model, compiler: EXLA)
+
+params = init_fn.(Nx.template({1, 784}, :f32), %{})
+```
+
+**Model Optimization**
+
+Axon’s model optimization API takes the same approach as that taken in DeepMind’s Optax. The goal of the API is to provide low-level constructs for creating advanced optimizers, and then to provide high-level optimizers built on top of that API.
+
+Axon considers optimizers as the tuple: {init_fn/1, update_fn/2}. The init_fn/1 function accepts a model’s parameters and initializes the optimizer’s state. The update_fn/2 function accepts “updates” (most commonly gradients in gradient-based optimization) and an optimizer state and returns transformed updates and a new optimizer state.
+
+**Training**
+
+The purpose of the training API is to provide conveniences and common routines for implementing training loops. Autograd simplifies the task of writing a machine learning algorithm down to the 
+task of writing a differentiable objective function.
+
+If you can write a parameterized, differentiable objective function, and pair that with data, you can make use of Axon’s training API.
