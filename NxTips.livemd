@@ -523,3 +523,31 @@ Nx.add(t1, t2)
 # Most operations have specific name rules that validate the operation
 # can be performed correctly on the given tensors.
 ```
+
+## Nx Tip of the Week #6 – Compiler or Backend?
+
+**If performance matters, benchmark and decide.** If you need flexibility or want to prototype quickly and not sacrifice speed, backends are a good choice.
+
+If you need AOT (Ahead of Time) compilation or your programs are very computationally intensive, compilers work better. Library writers should always write library functions in defn to leave this choice to the user.
+
+The power of Nx is in it’s flexibility. While the library contains pure Elixir implementations of every function in the main API, Nx is designed to integrate with compilers and backends with highly-optimized, native tensor manipulation routines.
+
+Implementations of the Nx API in the Nx module are actually meta-implementations that dispatch to third-party implementations of the same function at runtime. These meta-implementations act like contracts for functions in the Nx API.
+
+So, you can arbitrarily switch backends and somewhat guarantee your Nx implementations will remain unchanged.
+
+The defn adds another layer of indirection to the program execution. While calls to Nx outside of defn dispatch to backends which evaluate the result of the computation, calls to Nx within defn dispatch to an Expr backend.
+
+One thing you’ll notice when working with numerical definitions is that the first invocation of a defn is much slower than subsequent calls.
+
+That’s because the first invocation needs to do the work of compiling the program – depending on the size of the computation, this may require lots of time relative to program execution.
+
+Subsequent calls are cached; however, if you change the shape or type of your inputs, the numerical definition needs to compile a new version of your program specific to the input shape and type. If your input shapes or types are constantly changing, your bottleneck will almost certainly be compilation time.
+
+An additional pitfall of the compiled approach is the strictness of the syntax within defn. All inputs must be tensors (unless using keywords), you must match on tuple inputs, and you can use a limited subset of Elixir.
+
+You can only use grad from within defn.
+
+Backends like Torchx offer flexibility, and facilitate rapid prototyping, with pleasing performance gains over pure Elixir implementations. Compilers like EXLA unlock even more potential performance and memory optimizations, and open the door to things like ahead-of-time compilation. Generally, if you need the flexibility of intermixing Nx code with your regular Elixir code, using a backend is probably the more convenient option. Additionally, some Nx programs are so small or are such that they won’t benefit from performance gains from compilers.
+
+When dealing with compute intensive, purely numerical programs, compilers are usually the better option.
