@@ -462,3 +462,64 @@ When using keywords, if you have a value that’s constantly changing, you will 
 ```elixir
 NxKeywordTest.my_function(value: 0.3)
 ```
+
+## Nx Tip of the Week #5 – Named Tensors
+
+One of my biggest frustrations when working with NumPy and TensorFlow comes when working with axes.
+Named tensors fixed.
+
+```elixir
+t1 = Nx.tensor([[1, 2, 3]], names: [:batch, :data])
+t2 = Nx.tensor([[0, 1, 2]], names: [:batch, :data])
+```
+
+```elixir
+mse = fn x, y -> Nx.mean(Nx.subtract(x, y) |> Nx.pow(2), axes: [:data]) end
+mse.(t1, t2)
+```
+
+```elixir
+defmodule NxNamedTest do
+  import Nx.Defn
+
+  defn flip_left_right(x) do
+    x |> Nx.reverse(axes: [:width])
+  end
+
+  defn channels_first(x) do
+    x |> Nx.transpose(axes: [:batch, :channels, :height, :width])
+  end
+
+  defn channels_last(x) do
+    x |> Nx.transpose(axes: [:batch, :height, :width, :channels])
+  end
+end
+```
+
+**Broadcasting**
+
+```elixir
+t1 = Nx.tensor([[1, 2, 3]], names: [:batch, :data])
+t2 = Nx.tensor([[1, 2, 3]], names: [:x, :y])
+```
+
+```elixir
+# Since the axes (names) doesn't match the opertation will fail.
+Nx.add(t1, t2)
+# In order to perform binary operations on named tensors, the names must align.
+```
+
+```elixir
+# To execute a binary operation the name must either match,
+# or one of the names must be nil (considered a wild card name).
+
+t1 = Nx.tensor([[1, 2, 3]], names: [:batch, nil])
+t2 = Nx.tensor([[1, 2, 3]], names: [nil, :data])
+
+dbg({t1, t2})
+
+Nx.add(t1, t2)
+
+# Most operations have specific name rules that validate the operation
+# can be performed correctly on the given tensors.
+```
