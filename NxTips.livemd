@@ -660,3 +660,29 @@ jit_fn = Nx.Defn.jit(&JIT.softmax/1, compiler: EXLA)
 IO.inspect jit_fn.(uniform_1)
 IO.inspect JIT.softmax(uniform_2)
 ```
+
+## Nx Tip of the Week #7 – Using Nx.Defn.jit
+
+**Nx.Defn.aot/3** was removed it.
+
+Ahead-of-time compilation allows you to compile your numerical definitions into compact NIFs and execute them without needing the entire EXLA compiler and runtime.
+
+Nx.Defn.aot/3 defines a module to interact with the NIF for you, so most of the work is out of your hands.
+
+```elixir
+defmodule MyDefn do
+  import Nx.Defn
+  defn softmax(x) do
+    max_val = Nx.reduce_max(x)
+    Nx.exp(x - max_val) / Nx.sum(Nx.exp(x - max_val))
+  end
+end
+```
+
+```elixir
+Nx.Defn.aot(MyModule, [{:softmax, &MyDefn.softmax/1, [Nx.template({100}, {:f, 32})]}], compiler: EXLA)
+```
+
+There are, of course, tradeoffs to using AOT compiled functions. First, you need to know the type and shape of your inputs ahead-of-time. Depending on your needs, this can be a pretty serious limitation. Second, AOT compilation is only supported for CPUs, so you can’t take advantage of GPU or TPU acceleration.
+
+Overall, AOT compilation can be an excellent choice for deploying a model – especially at the edge. You can experiment on a more powerful machine before exporting the smaller compiled module to an edge device. I hope this gives you the tools you need to experiment with AOT compilation.
