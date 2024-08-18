@@ -219,3 +219,159 @@ Nx.sum(a, axes: [:z, :y]) == Nx.sum(a, axes: [:y, :z])
 ```
 
 Notice how in each case the axis that disappears is the one provided in axes. axes also supports negative indexing; however, you should generally prefer using named axes over integer axes wherever possible.
+
+## Nx Tip of the Week #3 – Many Ways to Create Arrays* (*Tensors)
+
+In Nx, the fundamental type is the Tensor. You can think of a tensor as a multi-dimensional array, like the numpy.ndarray.
+
+```elixir
+# this is the most tempted to use, but you should usually try to avoid.
+# 0D Tensor
+Nx.tensor(1)
+```
+
+```elixir
+#1D Tensor
+Nx.tensor([1.0, 2.0, 3.0])
+```
+
+```elixir
+#ND Tensor
+Nx.tensor([[[[[[[[[[1,2]]]]]]]]]])
+```
+
+```elixir
+# By default, Nx.Tensor creates tensor with type s64
+# when the inputs are all integer types and f32 when the inputs are all float types.
+Nx.tensor([1.0, 2])
+
+```
+
+```elixir
+# You can also specify the input type and dimension names.
+Nx.tensor([1, 2, 3], type: {:bf, 16}, names: [:data])
+
+# Also you can define its backend, but you must added to the dependencies.
+#Nx.tensor([1, 2, 3], backend: Torchx.Backend)
+```
+
+Using Nx.tensor/2 is convenient, but is generally less efficient than other methods. Nx.Tensor generally represents tensor data as binaries, so Nx.tensor/2 needs to iterate through the entire list and rewrite it to a binary. You should avoid this, if possible.
+
+**From Binaries**
+
+Instead of creating tensors from lists, you should try to create tensors from binaries.
+
+Tensor data is generally stored in a binary. Using native manipulation is usually more efficient than with other data types.
+
+```elixir
+Nx.from_binary(<<0::64-signed-native>>, {:s, 64})
+```
+
+```elixir
+Nx.from_binary(<<0::32-float-native>>, {:f, 32})
+
+# Notice Nx.from_binary/2 requires the input type and infers the shape as a flat list. 
+
+# Note: You’ll likely want to brush up on binary pattern matching, 
+# creation, and manipulation as you work with Nx.
+```
+
+```elixir
+Nx.from_binary(<<1::64-float-native>>, {:f, 64})
+```
+
+```elixir
+Nx.from_binary(<<1::64-float-native>>, {:f, 32})
+```
+
+```elixir
+Nx.from_binary(<<1::64-float-native>>, {:s, 64})
+```
+
+```elixir
+Nx.from_binary(<<1::64-float-native>>, {:u, 8})
+```
+
+```elixir
+t = Nx.from_binary(<<1::64-float-native>>, {:f, 64})
+Nx.reshape(t, {1, 1, 1, 1})
+
+# Nx.reshape/2 is actually just a meta operation. 
+# The implementation doesn’t move the underlying bytes at all, 
+# it just changes the shape property of the input tensor.
+
+# You just need to know the shape of the input data.
+```
+
+**Broadcasting**
+
+```elixir
+# np.full, np.full_like -> Nx.broadcast
+ zeros = Nx.broadcast(0, {2, 5})
+```
+
+```elixir
+ones_like_zeros = Nx.broadcast(1, zeros)
+```
+
+```elixir
+# If you want to dictate the output type
+
+Nx.broadcast(Nx.tensor(0, type: {:bf, 16}), {2, 2})
+```
+
+**Counting Up**
+
+```elixir
+# Nx.iota/2. Nx.iota/2 is like np.arange
+
+Nx.iota({2, 5}, axis: 1)
+```
+
+```elixir
+Nx.iota({2, 5})
+```
+
+```elixir
+Nx.iota({1}, type: {:bf, 16}, names: [:data])
+```
+
+```elixir
+Nx.multiply(Nx.iota({2, 5}, axis: 1), 3)
+```
+
+```elixir
+# Eye matrix
+Nx.equal(Nx.iota({3, 3}, axis: 0), Nx.iota({3, 3}, axis: 1))
+```
+
+**Random Numbers**
+
+```elixir
+key = Nx.Random.key(103)
+
+{uniform, _new_key} = Nx.Random.uniform(key, shape: {2, 2}, type: {:f, 32})
+```
+
+```elixir
+{normal, _new_key} = Nx.Random.normal(key, 0, 5, shape: {2,2})
+```
+
+```elixir
+# create a random mask
+
+probability = 0.5
+{uniform, _new_key} = Nx.Random.uniform(key, shape: {5, 5})
+Nx.select(Nx.less_equal(uniform, probability), 0, 1)
+```
+
+**Template**
+
+Nx also has a template creation method that defines a template for an expected future value. This is useful for things like ahead-of-time compilation.
+
+```elixir
+# You can't perform any operation on this tensor. 
+# It exists exclusively to define APIs that say a tensor 
+# with a certain type, shape, and names is expected in the future.
+t = Nx.template({4, 4, 4}, {:f, 32}, names: [:x, :y, :z])
+```
