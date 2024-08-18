@@ -634,3 +634,29 @@ The purpose of the training API is to provide conveniences and common routines f
 task of writing a differentiable objective function.
 
 If you can write a parameterized, differentiable objective function, and pair that with data, you can make use of Axon’s training API.
+
+## Nx Tip of the Week #7 – Using Nx.Defn.jit
+
+There are actually 2 ways in Nx to accelerate your numerical definitions: invoking calls to defn with a @defn_compiler attribute set, or calling Nx.Defn.jit/3.
+
+Using Nx.Defn.jit/3 is very useful when integrating numerical definitions with regular Elixir code.
+
+```elixir
+defmodule JIT do
+  import Nx.Defn
+ 
+  defn softmax(x) do
+    max_val = Nx.reduce_max(x)
+    Nx.exp(x - max_val) / Nx.sum(Nx.exp(x - max_val))
+  end
+end
+
+key = Nx.Random.key(103)
+{uniform_1, new_key} = Nx.Random.uniform(key, shape: {5})
+{uniform_2, _new_key} = Nx.Random.uniform(new_key, shape: {5})
+
+jit_fn = Nx.Defn.jit(&JIT.softmax/1, compiler: EXLA)
+ 
+IO.inspect jit_fn.(uniform_1)
+IO.inspect JIT.softmax(uniform_2)
+```
