@@ -756,3 +756,59 @@ greater_than_a = Nx.greater(a, 0)
 dbg({a, greater_than_a})
 non_negative_a = Nx.select(greater_than_a, a, 0)
 ```
+
+## Nx Tip of the Week #11 – While Loops
+
+**Note:** try to avoid using it.
+
+Nx has a while construct which is implemented as an Elixir macro. The while construct takes an initial state, a condition, and a body which returns a shape which is the same as the initial state. It’s essentially a reduce_while, which aggregates state while some condition is satisfied.
+
+```elixir
+defmodule NxWhileTest do
+  import Nx.Defn
+
+  defn count_to_ten() do
+    # is like a C for, while (initial_condition, loop_condition, code_to_be_excuted)
+    while(i = 0, i < 10, do: i + 1)
+  end
+
+  defn count_to_ten_twice() do
+    while({i = 0, j = 0}, i < 10, do: {i + 1, j + 1})
+  end
+
+  # The shape of the body of the while loop must match 
+  # the shape of the initial condition.
+
+  defn build_a_vector() do
+    # Create a "filler" tensor
+    initial_tensor = Nx.broadcast(0.0, {12})
+    key = Nx.Random.key(103)
+
+    {_, final_tensor, _key} =
+      while {i = 0, initial_tensor, key}, i < 12 do
+        {val, new_key} = Nx.Random.uniform(key, shape: {1})
+        # Update filler tensor "in-place"
+        {i + 1, Nx.put_slice(initial_tensor, [i], val), new_key}
+      end
+
+    final_tensor
+  end
+end
+```
+
+```elixir
+NxWhileTest.count_to_ten()
+```
+
+```elixir
+NxWhileTest.count_to_ten_twice()
+```
+
+```elixir
+NxWhileTest.build_a_vector()
+
+# The native defn loops you implement will be much more efficient than pure 
+# Elixir loops performing the same operations, 
+# but they’ll still be slow relative to other computations. 
+# Because they can be difficult for JIT compilers
+```
