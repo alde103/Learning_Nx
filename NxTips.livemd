@@ -885,3 +885,89 @@ jit_fn = Nx.Defn.jit(&NxHooksTest.my_defined_hooked_function/1, hooks: hooks)
 # Hooks are implemented on top of the Nx.Stream API.
 jit_fn.(tensor)
 ```
+
+## Nx Tip of the Week #14 – Slicing and Indexing
+
+Nx offers a few different slicing and indexing routines which allow you to accomplish most of what you would want to do. Slicing can be a bit tricky given static shape requirements, but you usually can work around limitations.
+
+```elixir
+a = Nx.tensor([[1, 2, 3], [4, 5, 6]])
+dbg(a) 
+Nx.slice(a, [0, 1], [1, 2])
+```
+
+```elixir
+tensor = Nx.tensor([
+  [1, 2, 3, 4],
+  [5, 6, 7, 8],
+  [9, 10, 11, 12],
+  [13, 14, 15, 16]
+])
+sub_tensor = Nx.slice(tensor, [0, 0], [2, 2])
+```
+
+```elixir
+# You may specify dynamic or tensor values for the start index
+# as long as they have a scalar shape:
+Nx.slice(a, [Nx.tensor(0), Nx.tensor(1)], [1, 2])
+```
+
+```elixir
+# The second list is the length of each slice. Each value must be known or static at compile-time. 
+# This is because the length dictates the final shape of the sliced tensor
+
+dbg(a)
+Nx.slice(a, [1, 2], [2, 3])
+
+```
+
+```elixir
+# You can also make use of the Access syntax which builds on top of normal slice operations.
+a[[1, 0..1]]
+# you’re accessing the first index from the first dimension 
+# and the zero to first indices from the second dimension.
+```
+
+```elixir
+# In newer versions of Elixir, you can slice an entire axis with '..'
+a[[.., 2]]
+# this tells that you want every element from the first dimension, 
+# but only the 2 of the second dimension
+```
+
+```elixir
+# this gets all elements for the 2 dimensions.
+a[[..,..]]
+```
+
+```elixir
+# If Nx.slice/4 and the Access syntax is not flexible enough for you, 
+# you can try one of Nx.take/3, Nx.gather/3, and Nx.take_along_axis/3. 
+
+tokens = Nx.tensor([127, 32, 0, 1, 5, 6])
+key = Nx.Random.key(103)
+
+{weights, _new_key} = Nx.Random.uniform(key, shape: {128, 32})
+
+Nx.take(weights, tokens)
+
+```
+
+```elixir
+a = Nx.tensor([[4, 3, 0, 1, 6, 8], [5, 1, 2, 3, 6, 9]])
+indices = Nx.argsort(a, axis: 1, stable: true)
+dbg({a, indices})
+Nx.take_along_axis(a, indices, axis: 1)
+```
+
+```elixir
+a = Nx.tensor([5, 1, 2, 3, 6, 9])
+indices = Nx.argsort(a, direction: :desc)
+```
+
+```elixir
+# Nx.gather/3 contains a tensor of indices, 
+# where the last axes in the indices tensor represents a single value in the source tensor
+t = Nx.tensor([[1, 2], [3, 4]])
+Nx.gather(t, Nx.tensor([[[1, 1], [0, 1], [1, 0], [1, 0]], [[1, 1], [0, 1], [1, 0], [1, 0]]]))
+```
