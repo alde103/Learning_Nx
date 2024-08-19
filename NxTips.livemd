@@ -828,3 +828,60 @@ tensor = Nx.tensor([
 
 heatmap = Nx.to_heatmap(tensor)
 ```
+
+## Nx Tip of the Week #13 – Hooks
+
+Part of the restrictiveness of defn is the inability to debug in the same way you would debug a normal Elixir function.
+
+```elixir
+defmodule NxHooksTest do
+  import Nx.Defn
+  require Logger
+
+  defn my_impossible_fn(x) do
+    x |> Nx.exp() |> IO.inspect()
+  end
+
+  # Like IO.inspect, print_value will return the value 
+  # it’s passed and inspect the input contents to the console. 
+  # Note: inspect_value has been removed.
+  defn my_possible_fn(x) do
+    x |> Nx.exp() |> print_value()
+  end
+
+  # Nx.Defn.Kernel.hook allows you to perform side-effecting operations within defn. 
+  defn my_hooked_function(x) do
+    x |> Nx.exp() |> hook(&Logger.info/1)
+  end
+
+  defn my_defined_hooked_function(x) do
+    x |> Nx.exp() |> hook(:my_hook)
+  end
+end
+```
+
+```elixir
+tensor = Nx.tensor([1])
+NxHooksTest.my_impossible_fn(tensor)
+```
+
+```elixir
+tensor = Nx.tensor([1])
+NxHooksTest.my_possible_fn(tensor)
+```
+
+```elixir
+NxHooksTest.my_hooked_function(tensor)
+```
+
+```elixir
+hooks = %{my_hook: &IO.inspect/1}
+jit_fn = Nx.Defn.jit(&NxHooksTest.my_defined_hooked_function/1, hooks: hooks)
+```
+
+```elixir
+# Hooked values must be used by a value returned by defn, 
+# otherwise the hook will never execute.
+# Hooks are implemented on top of the Nx.Stream API.
+jit_fn.(tensor)
+```
