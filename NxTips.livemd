@@ -739,3 +739,20 @@ dbg(tensor)
 # Aplicamos una suma de ventana de 2x2
 window_suma = Nx.window_max(tensor, {3, 3}, strides: [2, 1])
 ```
+
+## Nx Tip of the Week #10 – Using Nx.select
+
+You can solve a problem that you think requires boolean indexing with Nx.select. Nx.select builds a tensor from 3 tensors:
+
+* A mask
+* A true tensor
+* A false tensor
+
+Nx.select will choose values from the true tensor when corresponding values in the mask are true and values from the false tensor when they are not.
+
+```elixir
+a = Nx.tensor([[-1, 2, -3], [4, -5, 6]])
+greater_than_a = Nx.greater(a, 0)
+dbg({a, greater_than_a})
+non_negative_a = Nx.select(greater_than_a, a, 0)
+```
