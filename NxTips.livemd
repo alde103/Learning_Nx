@@ -661,7 +661,7 @@ IO.inspect jit_fn.(uniform_1)
 IO.inspect JIT.softmax(uniform_2)
 ```
 
-## Nx Tip of the Week #7 – Using Nx.Defn.jit
+## Nx Tip of the Week #8 – Using Nx.Defn.aot/3
 
 **Nx.Defn.aot/3** was removed it.
 
@@ -686,3 +686,56 @@ Nx.Defn.aot(MyModule, [{:softmax, &MyDefn.softmax/1, [Nx.template({100}, {:f, 32
 There are, of course, tradeoffs to using AOT compiled functions. First, you need to know the type and shape of your inputs ahead-of-time. Depending on your needs, this can be a pretty serious limitation. Second, AOT compilation is only supported for CPUs, so you can’t take advantage of GPU or TPU acceleration.
 
 Overall, AOT compilation can be an excellent choice for deploying a model – especially at the edge. You can experiment on a more powerful machine before exporting the smaller compiled module to an edge device. I hope this gives you the tools you need to experiment with AOT compilation.
+
+## Nx Tip of the Week #9 – Window Functions
+
+Note: You should just know that the body of a `while` loop will always be executed sequentially and will roundtrip data back to the CPU even when running on GPU.
+
+```elixir
+defmodule NxWindowsTest do
+  def cumsum(tensor, opts \\ []) do
+    axis = opts[:axis]
+
+    {padding_config, strides, window_shape} = create_windows(tensor, axis)
+
+    Nx.window_sum(tensor, window_shape, strides: strides, padding: padding_config)
+  end
+
+  def create_windows(tensor, axis) do
+    n = elem(Nx.shape(tensor), axis)
+
+    padding_config =
+      for i <- 0..(Nx.rank(tensor) - 1) do
+        if i == axis, do: {n - 1, 0}, else: {0, 0}
+      end
+
+    strides = List.duplicate(1, Nx.rank(tensor))
+
+    window_shape =
+      List.duplicate(1, Nx.rank(tensor))
+      |> List.to_tuple()
+      |> put_elem(axis, n)
+
+    {padding_config, strides, window_shape}
+  end
+end
+```
+
+```elixir
+revenue_by_month = Nx.tensor([[100, 200, 100, 50, 150]])
+NxWindowsTest.cumsum(revenue_by_month, axis: 1)
+```
+
+```elixir
+tensor = Nx.tensor([
+  [1, 2, 3, 4],
+  [5, 6, 7, 8],
+  [9, 10, 11, 12],
+  [13, 14, 15, 16]
+])
+
+dbg(tensor)
+
+# Aplicamos una suma de ventana de 2x2
+window_suma = Nx.window_max(tensor, {3, 3}, strides: [2, 1])
+```
