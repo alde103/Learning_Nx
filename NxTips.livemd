@@ -812,3 +812,19 @@ NxWhileTest.build_a_vector()
 # but they’ll still be slow relative to other computations. 
 # Because they can be difficult for JIT compilers
 ```
+
+## Nx Tip of the Week #12 – Nx.to_heatmap
+
+Sometimes you want to quickly visualize the contents of a tensor. A quick way to visualize images across a single color channel is with Nx.to_heatmap.
+
+When inspecting the result of Nx.to_heatmap, you’ll get a nice console representation of a heatmap printed out. This is especially useful when you’re quickly debugging and don’t want to bring in any additional dependencies such as VegaLite.
+
+```elixir
+tensor = Nx.tensor([
+  [1, 2, 3],
+  [4, 5, 6],
+  [7, 8, 9]
+])
+
+heatmap = Nx.to_heatmap(tensor)
+```
